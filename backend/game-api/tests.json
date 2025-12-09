@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {
+      "name": "Test OPTIONS request",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test get user without auth",
+      "method": "GET",
+      "path": "/?action=user",
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

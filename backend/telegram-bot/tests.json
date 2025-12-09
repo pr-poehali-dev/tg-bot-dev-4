@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "name": "Test webhook OPTIONS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test webhook POST with start command",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "message": {
+          "chat": {
+            "id": 123456789
+          },
+          "from": {
+            "id": 123456789,
+            "username": "testuser",
+            "first_name": "Test"
+          },
+          "text": "/start"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "ok": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
