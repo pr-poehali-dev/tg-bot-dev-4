@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
+import { getUserData, getLeaderboard, playGame as apiPlayGame, buyItem as apiBuyItem } from '@/lib/api';
 
 type GameSection = 'home' | 'games' | 'leaderboard' | 'achievements' | 'shop' | 'quests';
 
@@ -45,6 +46,45 @@ const Index = () => {
     achievements: 12,
     totalAchievements: 50,
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    loadUserData();
+    loadLeaderboard();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const data = await getUserData();
+      setUserStats({
+        coins: data.coins,
+        level: data.level,
+        xp: data.xp,
+        xpToNextLevel: data.xp_to_next_level,
+        achievements: data.achievements_count,
+        totalAchievements: 50,
+      });
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const data = await getLeaderboard();
+      setLeaderboardData(data);
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+    }
+  };
 
   const [quests] = useState<Quest[]>([
     {
@@ -83,36 +123,56 @@ const Index = () => {
     { id: '4', name: 'Редкая рамка', price: 350, icon: 'Award', description: 'Уникальная рамка профиля' },
   ]);
 
-  const leaderboard = [
-    { rank: 1, name: 'ProGamer2024', coins: 15800, level: 25 },
-    { rank: 2, name: 'MegaMaster', coins: 14200, level: 23 },
-    { rank: 3, name: 'CoolPlayer', coins: 12900, level: 22 },
-    { rank: 4, name: 'TopGun', coins: 11500, level: 20 },
-    { rank: 5, name: 'StarHero', coins: 10200, level: 19 },
-  ];
-
-  const playGame = (gameName: string, coinReward: number, xpReward: number) => {
-    setUserStats(prev => ({
-      ...prev,
-      coins: prev.coins + coinReward,
-      xp: prev.xp + xpReward >= prev.xpToNextLevel ? 0 : prev.xp + xpReward,
-      level: prev.xp + xpReward >= prev.xpToNextLevel ? prev.level + 1 : prev.level,
-    }));
-    toast.success(`🎮 ${gameName}`, {
-      description: `+${coinReward} монет, +${xpReward} XP`,
-    });
+  const playGame = async (gameName: string, coinReward: number, xpReward: number) => {
+    try {
+      const result = await apiPlayGame(gameName, coinReward, xpReward);
+      
+      setUserStats(prev => ({
+        ...prev,
+        coins: result.coins,
+        level: result.level,
+        xp: prev.xp + xpReward >= prev.xpToNextLevel ? 0 : prev.xp + xpReward,
+      }));
+      
+      toast.success(`🎮 ${gameName}`, {
+        description: `+${coinReward} монет, +${xpReward} XP`,
+      });
+      
+      await loadLeaderboard();
+    } catch (error) {
+      console.error('Error playing game:', error);
+      toast.error('Ошибка при сохранении игры');
+    }
   };
 
-  const buyItem = (item: ShopItem) => {
+  const buyItem = async (item: ShopItem) => {
     if (userStats.coins >= item.price) {
-      setUserStats(prev => ({ ...prev, coins: prev.coins - item.price }));
-      toast.success(`Куплено: ${item.name}! 🎉`);
+      try {
+        const result = await apiBuyItem(item.name, item.price);
+        
+        setUserStats(prev => ({ ...prev, coins: result.coins }));
+        toast.success(`Куплено: ${item.name}! 🎉`);
+      } catch (error) {
+        console.error('Error buying item:', error);
+        toast.error('Ошибка при покупке');
+      }
     } else {
       toast.error('Недостаточно монет! 💰');
     }
   };
 
   const xpPercentage = (userStats.xp / userStats.xpToNextLevel) * 100;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-pulse">🎮</div>
+          <p className="text-xl text-foreground">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/20">
@@ -339,7 +399,9 @@ const Index = () => {
                 <Icon name="Trophy" className="text-yellow-400" />
                 Таблица лидеров
               </h2>
-              {leaderboard.map((player, index) => (
+              {(leaderboardData.length > 0 ? leaderboardData : [
+                { rank: 1, name: 'Загрузка...', coins: 0, level: 1 },
+              ]).map((player, index) => (
                 <Card key={index} className={`p-6 ${index < 3 ? 'border-2 border-primary/50' : ''}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
